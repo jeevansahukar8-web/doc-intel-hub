@@ -1,0 +1,50 @@
+# --- General Dependencies ---
+node_modules/
+package-lock.json # Optional: Remove this line if you WANT to version control your lock file (recommended to keep lock file, but some prefer to ignore it)
+yarn.lock
+
+# --- OS & Editor Files ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# --- Logs ---
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs
+*.log
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# --- Environment Variables (CRITICAL) ---
+# Never commit these as they contain API keys and DB passwords
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+*.env.*
+
+# --- Client (Vite/React) ---
+# Build output
+client/dist/
+client/dist-ssr/
+
+# Editor directories and files
+.eslintcache
+
+# --- Server (Node/Express) ---
+# File Uploads (Ignore the files, but keep the folder structure usually)
+server/uploads/*
+!server/uploads/.gitkeep
+
+# Optional: if you have a specific database data folder locally
+data/
+db/
