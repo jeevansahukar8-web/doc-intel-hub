@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Upload, FileText, MessageSquare, Send, Loader2, 
-  Trash2, Plus, Bot, Menu, UserCircle, LogOut
+  FileText, MessageSquare, Send, Loader2, 
+  Trash2, Plus, Bot, Menu, UserCircle, LogOut, X
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Routes, Route, useNavigate, Link } from 'react-router-dom';
@@ -26,25 +26,16 @@ function Dashboard() {
   const token = localStorage.getItem('token');
   const username = localStorage.getItem('username');
 
-  // Load documents on mount
   useEffect(() => {
-    if (!token) {
-      navigate('/');
-      return;
-    }
+    if (!token) { navigate('/'); return; }
     fetchDocuments();
   }, [token, navigate]);
 
-  // Load Chat History when selectedDoc changes
   useEffect(() => {
-    if (selectedDoc) {
-      fetchChatHistory(selectedDoc._id);
-    } else {
-      setChatHistory([]);
-    }
+    if (selectedDoc) { fetchChatHistory(selectedDoc._id); } 
+    else { setChatHistory([]); }
   }, [selectedDoc]);
 
-  // Scroll to bottom of chat
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatHistory, loading]);
@@ -54,31 +45,19 @@ function Dashboard() {
       const res = await fetch(`${API_BASE}/documents`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (res.status === 401 || res.status === 403) {
-        localStorage.clear();
-        navigate('/');
-        return;
-      }
+      if (res.status === 401 || res.status === 403) { localStorage.clear(); navigate('/'); return; }
       const data = await res.json();
       setDocuments(data);
-    } catch (err) {
-      console.error("Failed to load docs", err);
-    }
+    } catch (err) { console.error("Failed to load docs", err); }
   };
 
   const fetchChatHistory = async (docId) => {
-    // Optional: add a small loading state for history fetching if desired
     try {
       const res = await fetch(`${API_BASE}/chat/${docId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (res.ok) {
-        const data = await res.json();
-        setChatHistory(data);
-      }
-    } catch (err) {
-      console.error("Failed to fetch chat history", err);
-    }
+      if (res.ok) { const data = await res.json(); setChatHistory(data); }
+    } catch (err) { console.error("Failed to fetch chat history", err); }
   };
 
   const handleUpload = async (e) => {
@@ -94,38 +73,26 @@ function Dashboard() {
         headers: { 'Authorization': `Bearer ${token}` } 
       });
       fetchDocuments();
-      alert('Document uploaded!');
-    } catch (err) {
-      alert('Upload failed.');
-    } finally {
-      setUploading(false);
-    }
+      alert('Document uploaded successfully!');
+    } catch (err) { alert('Upload failed.'); } 
+    finally { setUploading(false); }
   };
 
   const handleDelete = async (e, docId) => {
     e.stopPropagation(); 
-    if (!confirm("Are you sure you want to delete this document?")) return;
-
+    if (!confirm("Delete this document?")) return;
     try {
       await fetch(`${API_BASE}/documents/${docId}`, { 
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      
       setDocuments(prev => prev.filter(d => d._id !== docId));
-      
-      if (selectedDoc?._id === docId) {
-        setSelectedDoc(null);
-        setChatHistory([]);
-      }
-    } catch (err) {
-      alert("Failed to delete.");
-    }
+      if (selectedDoc?._id === docId) { setSelectedDoc(null); setChatHistory([]); }
+    } catch (err) { alert("Failed to delete."); }
   };
 
   const handleAsk = async () => {
     if (!query.trim() || !selectedDoc) return;
-    
     const userMsg = { role: 'user', content: query };
     setChatHistory(prev => [...prev, userMsg]);
     setQuery('');
@@ -140,61 +107,64 @@ function Dashboard() {
         },
         body: JSON.stringify({ docId: selectedDoc._id, question: userMsg.content })
       });
-      
       const data = await res.json();
       setChatHistory(prev => [...prev, { role: 'ai', content: data.answer }]);
     } catch (err) {
       setChatHistory(prev => [...prev, { role: 'ai', content: "⚠️ Error processing request." }]);
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
-  const handleLogout = () => {
-    localStorage.clear();
-    navigate('/');
-  };
+  const handleLogout = () => { localStorage.clear(); navigate('/'); };
 
   return (
-    <div className="flex h-screen bg-gray-50 font-sans text-gray-800 overflow-hidden">
-      {/* SIDEBAR */}
-      <div className={`${sidebarOpen ? 'w-72' : 'w-0'} bg-gray-900 text-white transition-all duration-300 flex flex-col overflow-hidden`}>
-        <div className="p-6 border-b border-gray-800 flex items-center gap-3">
-          <div className="p-2 bg-blue-600 rounded-lg"><Bot size={24} className="text-white" /></div>
-          <div><h1 className="font-bold text-lg tracking-wide">DocuMind</h1><p className="text-xs text-gray-400">Welcome, {username}</p></div>
+    <div className="flex h-screen font-sans overflow-hidden bg-transparent">
+      
+      {/* SIDEBAR - Glass Effect */}
+      <div className={`${sidebarOpen ? 'w-80 translate-x-0' : 'w-0 -translate-x-full opacity-0'} glass-panel absolute md:relative z-30 h-full flex flex-col transition-all duration-300 ease-out border-r-0 md:border-r border-white/20`}>
+        <div className="p-6 border-b border-white/10 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-lg shadow-blue-500/30">
+              <Bot size={24} className="text-white" />
+            </div>
+            <div>
+              <h1 className="font-bold text-lg tracking-wide text-white">DocuMind</h1>
+              <p className="text-xs text-blue-200">AI Workspace</p>
+            </div>
+          </div>
+          {/* Close sidebar on mobile */}
+          <button onClick={() => setSidebarOpen(false)} className="md:hidden text-white/70"><X size={20}/></button>
         </div>
 
-        {/* Navigation & Upload */}
         <div className="p-4 space-y-3">
-           <Link to="/profile" className="flex items-center w-full p-3 rounded-xl bg-gray-800 hover:bg-gray-700 transition-colors">
-            <UserCircle className="text-blue-400 mr-2" size={18} />
+           <Link to="/profile" className="flex items-center w-full p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/20 transition-all text-blue-100">
+            <UserCircle className="mr-3" size={20} />
             <span className="text-sm font-medium">My Profile</span>
           </Link>
 
-          <label className="flex items-center justify-center w-full p-3 rounded-xl border border-gray-700 hover:border-blue-500 hover:bg-gray-800 cursor-pointer transition-all group">
-            {uploading ? <Loader2 className="animate-spin text-blue-400 mr-2" /> : <Plus className="text-gray-400 group-hover:text-blue-400 mr-2" size={18} />}
+          <label className="flex items-center justify-center w-full p-3 rounded-xl border border-dashed border-white/30 hover:border-blue-400 hover:bg-blue-500/10 cursor-pointer transition-all group">
+            {uploading ? <Loader2 className="animate-spin text-blue-400 mr-2" /> : <Plus className="text-blue-300 group-hover:text-blue-400 mr-2" size={18} />}
             <span className="text-sm font-medium text-gray-300 group-hover:text-white">{uploading ? "Uploading..." : "New PDF Upload"}</span>
             <input type="file" className="hidden" accept=".pdf" onChange={handleUpload} disabled={uploading} />
           </label>
         </div>
 
-        {/* List */}
-        <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1">
-          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 mb-2">Library</div>
+        <div className="flex-1 overflow-y-auto px-4 py-2 space-y-2">
+          <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 ml-1">Your Library</div>
           {documents.map(doc => (
             <div
               key={doc._id}
-              onClick={() => { setSelectedDoc(doc); }}
-              className={`group w-full text-left p-3 rounded-lg flex items-center gap-3 transition-all cursor-pointer ${
-                selectedDoc?._id === doc._id ? 'bg-blue-600 text-white shadow-lg' : 'hover:bg-gray-800 text-gray-400 hover:text-white'
+              onClick={() => { setSelectedDoc(doc); if(window.innerWidth < 768) setSidebarOpen(false); }}
+              className={`group w-full p-3 rounded-xl flex items-center gap-3 transition-all cursor-pointer border ${
+                selectedDoc?._id === doc._id 
+                ? 'bg-blue-600/90 border-blue-500 shadow-lg shadow-blue-900/50 text-white' 
+                : 'bg-transparent border-transparent hover:bg-white/5 text-gray-300 hover:text-white'
               }`}
             >
-              <FileText size={16} className="shrink-0" />
-              <div className="truncate text-sm flex-1">{doc.originalName || doc.filename}</div>
+              <FileText size={18} className={selectedDoc?._id === doc._id ? 'text-white' : 'text-blue-400 group-hover:text-blue-300'} />
+              <div className="truncate text-sm flex-1 font-medium">{doc.originalName || doc.filename}</div>
               <button 
                 onClick={(e) => handleDelete(e, doc._id)}
-                className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-500/20 hover:text-red-400 rounded transition-all"
-                title="Delete Document"
+                className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-500/20 hover:text-red-400 rounded-lg transition-all"
               >
                 <Trash2 size={14} />
               </button>
@@ -202,62 +172,117 @@ function Dashboard() {
           ))}
         </div>
 
-        {/* Footer */}
-        <div className="p-4 border-t border-gray-800">
-            <button onClick={handleLogout} className="flex items-center gap-2 text-gray-400 hover:text-white w-full px-2 py-2 rounded-lg hover:bg-gray-800 transition-colors">
-                <LogOut size={16} /> <span className="text-sm">Log Out</span>
+        <div className="p-4 border-t border-white/10">
+            <button onClick={handleLogout} className="flex items-center gap-3 text-gray-400 hover:text-white w-full px-3 py-2 rounded-xl hover:bg-white/5 transition-all">
+                <LogOut size={18} /> <span className="text-sm font-medium">Log Out</span>
             </button>
         </div>
       </div>
 
-      {/* MAIN CHAT AREA */}
-      <div className="flex-1 flex flex-col h-full relative">
-        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 shadow-sm z-10">
-          <div className="flex items-center gap-3">
-            <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-600"><Menu size={20} /></button>
-            <h2 className="font-semibold text-gray-800 truncate max-w-md">{selectedDoc ? selectedDoc.originalName : 'Select a document to chat'}</h2>
+      {/* MAIN AREA */}
+      <div className="flex-1 flex flex-col h-full relative glass-panel m-0 md:m-4 md:rounded-2xl border-none md:border overflow-hidden">
+        
+        {/* Header */}
+        <header className="h-16 border-b border-white/10 flex items-center justify-between px-6 bg-white/5 backdrop-blur-md z-20">
+          <div className="flex items-center gap-4">
+            <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2 hover:bg-white/10 rounded-lg text-white transition-colors">
+              <Menu size={20} />
+            </button>
+            <h2 className="font-semibold text-white truncate max-w-md text-lg">
+              {selectedDoc ? selectedDoc.originalName : 'Select a document'}
+            </h2>
           </div>
+          {selectedDoc && (
+            <span className="hidden sm:flex px-3 py-1 bg-green-500/10 border border-green-500/20 text-green-400 text-xs font-medium rounded-full items-center gap-2">
+              <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
+              Active
+            </span>
+          )}
         </header>
 
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex overflow-hidden relative">
           {selectedDoc ? (
             <>
-              {/* PDF VIEWER */}
-              <div className="w-1/2 bg-gray-200 border-r border-gray-300 hidden md:block">
+              {/* PDF VIEWER - Hidden on mobile, takes 50% on desktop */}
+              <div className="hidden md:block w-1/2 bg-slate-900 border-r border-white/10">
                 <iframe src={getFileUrl(selectedDoc.filename)} className="w-full h-full" title="PDF Viewer" />
               </div>
-              {/* CHAT INTERFACE */}
-              <div className="w-full md:w-1/2 flex flex-col bg-white">
+
+              {/* CHAT INTERFACE - Full width on mobile, 50% on desktop */}
+              <div className="w-full md:w-1/2 flex flex-col bg-slate-900/50 backdrop-blur-sm">
+                
+                {/* Messages Area */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-6">
                   {chatHistory.length === 0 && (
-                    <div className="flex flex-col items-center justify-center h-full text-gray-400 space-y-4">
-                      <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center"><MessageSquare className="text-blue-500 w-8 h-8" /></div>
-                      <p className="text-sm font-medium">Ask questions about this PDF</p>
+                    <div className="flex flex-col items-center justify-center h-full text-gray-500 space-y-4 animate-fade-in">
+                      <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center border border-white/10">
+                        <MessageSquare className="text-blue-400 w-8 h-8" />
+                      </div>
+                      <p className="text-sm font-medium">Ask specific questions about this PDF.</p>
                     </div>
                   )}
+                  
                   {chatHistory.map((msg, idx) => (
-                    <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-[85%] p-4 rounded-2xl shadow-sm text-sm leading-relaxed ${msg.role === 'user' ? 'bg-blue-600 text-white rounded-br-none' : 'bg-gray-100 text-gray-800 rounded-bl-none border border-gray-200'}`}>
-                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                    <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-slide-up`}>
+                      <div className={`max-w-[90%] md:max-w-[85%] p-4 rounded-2xl shadow-lg backdrop-blur-md border ${
+                        msg.role === 'user' 
+                        ? 'bg-blue-600 text-white rounded-br-sm border-blue-500' 
+                        : 'bg-white/10 text-gray-100 rounded-bl-sm border-white/10'
+                      }`}>
+                        {/* PROSE CLASS FOR FORMATTED MARKDOWN */}
+                        <div className={`prose prose-sm max-w-none ${msg.role === 'user' ? 'prose-invert text-white' : 'prose-invert text-gray-100'}`}>
+                          <ReactMarkdown>{msg.content}</ReactMarkdown>
+                        </div>
                       </div>
                     </div>
                   ))}
-                  {loading && <div className="flex justify-start"><div className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-3"><Loader2 className="w-4 h-4 animate-spin text-blue-600" /><span className="text-xs text-gray-500 font-medium">Thinking...</span></div></div>}
+                  
+                  {loading && (
+                    <div className="flex justify-start animate-pulse">
+                      <div className="bg-white/5 border border-white/10 px-4 py-3 rounded-2xl flex items-center gap-3">
+                        <Loader2 className="w-4 h-4 animate-spin text-blue-400" />
+                        <span className="text-xs text-gray-400 font-medium">Analyzing document...</span>
+                      </div>
+                    </div>
+                  )}
                   <div ref={chatEndRef} />
                 </div>
-                <div className="p-4 border-t border-gray-100 bg-white">
-                  <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl p-2 focus-within:ring-2 focus-within:ring-blue-100 transition-all shadow-sm">
-                    <input type="text" value={query} onChange={(e) => setQuery(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleAsk()} placeholder="Ask any question..." className="flex-1 bg-transparent px-3 py-2 focus:outline-none text-sm text-gray-700" disabled={loading} />
-                    <button onClick={handleAsk} disabled={loading || !query.trim()} className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"><Send size={18} /></button>
+
+                {/* Input Area */}
+                <div className="p-4 border-t border-white/10 bg-white/5 backdrop-blur-md">
+                  <div className="flex items-center gap-2 bg-black/20 border border-white/10 rounded-xl p-1.5 focus-within:border-blue-500/50 focus-within:ring-1 focus-within:ring-blue-500/50 transition-all">
+                    <input 
+                      type="text" 
+                      value={query} 
+                      onChange={(e) => setQuery(e.target.value)} 
+                      onKeyPress={(e) => e.key === 'Enter' && handleAsk()} 
+                      placeholder="Ask any question..." 
+                      className="flex-1 bg-transparent px-4 py-2.5 focus:outline-none text-sm text-white placeholder-gray-500" 
+                      disabled={loading} 
+                    />
+                    <button 
+                      onClick={handleAsk} 
+                      disabled={loading || !query.trim()} 
+                      className="p-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg shadow-lg shadow-blue-600/20 disabled:opacity-50 disabled:shadow-none transition-all"
+                    >
+                      <Send size={18} />
+                    </button>
                   </div>
                 </div>
               </div>
             </>
           ) : (
-             <div className="flex-1 flex flex-col items-center justify-center bg-gray-50 text-center p-8">
-              <div className="w-24 h-24 bg-white rounded-full shadow-md flex items-center justify-center mb-6"><FileText className="w-10 h-10 text-blue-500" /></div>
-              <h3 className="text-2xl font-bold text-gray-800 mb-2">Welcome, {username}</h3>
-              <p className="text-gray-500 max-w-md">Select a document from the sidebar or upload a new one to get started.</p>
+            <div className="flex-1 flex flex-col items-center justify-center text-center p-8 animate-fade-in">
+              <div className="relative group">
+                <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full blur opacity-25 group-hover:opacity-50 transition duration-1000"></div>
+                <div className="relative w-24 h-24 bg-white/5 border border-white/10 rounded-full flex items-center justify-center">
+                  <FileText className="w-10 h-10 text-blue-400" />
+                </div>
+              </div>
+              <h3 className="text-2xl font-bold text-white mt-6 mb-2">Welcome, {username}</h3>
+              <p className="text-gray-400 max-w-md leading-relaxed">
+                Select a document from the library or upload a new PDF to harness the power of AI analysis.
+              </p>
             </div>
           )}
         </div>
@@ -266,7 +291,7 @@ function Dashboard() {
   );
 }
 
-// ROUTING SETUP
+// Routes
 function App() {
   return (
     <Routes>

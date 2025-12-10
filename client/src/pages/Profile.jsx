@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Trash2, ArrowLeft, User } from 'lucide-react';
+import { FileText, Trash2, ArrowLeft, User, Calendar } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
 export default function Profile() {
@@ -21,9 +21,7 @@ export default function Profile() {
       });
       const data = await res.json();
       setDocuments(data);
-    } catch (err) {
-      console.error("Failed to load docs", err);
-    }
+    } catch (err) { console.error("Failed to load docs", err); }
   };
 
   const handleDelete = async (docId) => {
@@ -34,72 +32,87 @@ export default function Profile() {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       setDocuments(prev => prev.filter(d => d._id !== docId));
-    } catch (err) {
-      alert("Failed to delete.");
-    }
+    } catch (err) { alert("Failed to delete."); }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-4xl mx-auto">
-        <Link to="/dashboard" className="flex items-center text-gray-500 hover:text-blue-600 mb-6 transition-colors">
-          <ArrowLeft size={20} className="mr-2" /> Back to Dashboard
+    <div className="min-h-screen p-8">
+      <div className="max-w-5xl mx-auto animate-fade-in">
+        <Link to="/dashboard" className="inline-flex items-center text-gray-400 hover:text-white mb-8 transition-colors group">
+          <ArrowLeft size={20} className="mr-2 group-hover:-translate-x-1 transition-transform" /> Back to Dashboard
         </Link>
         
         {/* Profile Card */}
-        <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 mb-8 flex items-center gap-6">
-          <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center text-blue-600">
-            <User size={40} />
+        <div className="glass-panel p-8 rounded-3xl mb-10 flex flex-col md:flex-row items-center gap-8 relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 opacity-50"></div>
+          
+          <div className="w-24 h-24 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white shadow-xl shadow-blue-500/20 relative z-10">
+            <User size={48} />
           </div>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">{username}</h1>
-            <p className="text-gray-500">{email}</p>
-            <button 
-              onClick={() => { localStorage.clear(); navigate('/'); }}
-              className="mt-3 text-sm text-red-500 hover:text-red-600 font-medium"
-            >
-              Log Out
-            </button>
+          <div className="text-center md:text-left relative z-10 flex-1">
+            <h1 className="text-3xl font-bold text-white mb-1">{username}</h1>
+            <p className="text-blue-200 font-medium">{email}</p>
           </div>
+          <button 
+            onClick={() => { localStorage.clear(); navigate('/'); }}
+            className="relative z-10 px-6 py-2.5 bg-white/5 hover:bg-red-500/20 border border-white/10 hover:border-red-500/50 text-gray-300 hover:text-red-400 rounded-xl transition-all"
+          >
+            Log Out
+          </button>
         </div>
 
-        {/* File Manager Section */}
-        <h2 className="text-xl font-bold text-gray-800 mb-4">My Documents ({documents.length})</h2>
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        {/* File Manager */}
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-bold text-white">My Documents <span className="text-gray-500 text-sm font-normal ml-2">({documents.length})</span></h2>
+        </div>
+
+        <div className="glass-panel rounded-2xl overflow-hidden">
           {documents.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">No documents uploaded yet.</div>
+            <div className="p-12 text-center text-gray-500 flex flex-col items-center">
+              <FileText size={48} className="mb-4 opacity-20" />
+              <p>No documents uploaded yet.</p>
+            </div>
           ) : (
-            <table className="w-full text-left">
-              <thead className="bg-gray-50 text-gray-500 text-sm uppercase tracking-wider">
-                <tr>
-                  <th className="p-4 font-medium">Name</th>
-                  <th className="p-4 font-medium">Date Uploaded</th>
-                  <th className="p-4 font-medium text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {documents.map(doc => (
-                  <tr key={doc._id} className="hover:bg-gray-50 transition-colors">
-                    <td className="p-4 flex items-center gap-3 text-gray-700 font-medium">
-                      <FileText size={18} className="text-blue-500" />
-                      {doc.originalName || doc.filename}
-                    </td>
-                    <td className="p-4 text-gray-500 text-sm">
-                      {new Date(doc.uploadDate).toLocaleDateString()}
-                    </td>
-                    <td className="p-4 text-right">
-                      <button 
-                        onClick={() => handleDelete(doc._id)}
-                        className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                        title="Delete"
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-white/10 text-gray-400 text-xs uppercase tracking-wider">
+                    <th className="p-5 font-semibold">Document Name</th>
+                    <th className="p-5 font-semibold">Upload Date</th>
+                    <th className="p-5 font-semibold text-right">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {documents.map(doc => (
+                    <tr key={doc._id} className="hover:bg-white/5 transition-colors group">
+                      <td className="p-5">
+                        <div className="flex items-center gap-4">
+                          <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400">
+                            <FileText size={20} />
+                          </div>
+                          <span className="font-medium text-gray-200 group-hover:text-white transition-colors">{doc.originalName || doc.filename}</span>
+                        </div>
+                      </td>
+                      <td className="p-5 text-gray-400 text-sm">
+                        <div className="flex items-center gap-2">
+                          <Calendar size={14} />
+                          {new Date(doc.uploadDate).toLocaleDateString()}
+                        </div>
+                      </td>
+                      <td className="p-5 text-right">
+                        <button 
+                          onClick={() => handleDelete(doc._id)}
+                          className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
+                          title="Delete"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       </div>
