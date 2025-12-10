@@ -1,167 +1,182 @@
-# **DocuMind \- AI Document Intelligence Hub**
+# DocuMind – AI Document Intelligence Hub
 
-DocuMind is a modern web application that allows users to upload documents (PDF, DOCX, TXT) and interact with them using an intelligent AI chat interface. Powered by Google's **Gemini 2.5 Flash** model, it provides instant answers based strictly on the content of your uploaded files.
+DocuMind is a modern web application that allows users to upload documents (PDF, DOCX, TXT) and intelligently interact with them using an AI-powered chat interface. Powered by **Google Gemini 2.5 Flash**, DocuMind provides instant, accurate answers strictly based on the contents of uploaded files.
 
-## **🚀 Features**
+---
 
-* **Multi-Format Support:** Upload and process **PDF**, **Word (.docx)**, and **Text (.txt)** files.  
-* **AI Chat:** Ask questions about your documents and get accurate, context-aware answers using Gemini 2.5 Flash.  
-* **Document Preview:**  
-  * Integrated PDF viewer.  
-  * Raw text preview for .txt and .docx files.  
-* **User Authentication:** Secure JWT-based Login and Registration system.  
-* **Persistent Storage:** Chat history and documents are saved to MongoDB.  
-* **Responsive Design:** A beautiful, dark-themed UI built with React and Tailwind CSS.
+## 🚀 Features
 
-## **🛠️ Tech Stack**
+- **Multi‑Format Support:** Upload and process **PDF**, **DOCX**, and **TXT** files.
+- **AI Chat Interface:** Ask questions and get context‑aware answers using Gemini.
+- **Document Preview:**
+  - Built‑in PDF viewer.
+  - Rendered text preview for DOCX and TXT.
+- **User Authentication:** Secure login & registration with **JWT**.
+- **Chat + Document Persistence:** All user data is stored in **MongoDB**.
+- **Responsive UI:** Clean dark‑themed interface built with **React + Tailwind CSS**.
+
+---
+
+## 🛠️ Tech Stack
 
 ### **Frontend**
-
-* **React 19** (Vite)  
-* **Tailwind CSS** (Styling)  
-* **Lucide React** (Icons)  
-* **React Router DOM** (Navigation)  
-* **React Markdown** (Rendering AI responses)
+- React 19 (Vite)
+- Tailwind CSS
+- Lucide React Icons
+- React Router DOM
+- React Markdown
 
 ### **Backend**
+- Node.js + Express
+- MongoDB & Mongoose
+- Google Generative AI SDK (Gemini 2.5 Flash)
+- Multer (File Uploads)
+- Mammoth.js (DOCX parsing)
+- Bcrypt + JWT (Auth)
 
-* **Node.js & Express**  
-* **MongoDB** (Database) & **Mongoose**  
-* **Google Generative AI SDK** (Gemini API)  
-* **Multer** (File Uploads)  
-* **Mammoth** (DOCX text extraction)  
-* **Bcrypt** & **JWT** (Auth)
+---
 
-## **⚙️ Installation & Setup**
+## ⚙️ Installation & Setup
 
-### **1\. Prerequisites**
+### 1. Prerequisites
 
-Before you begin, ensure you have the following installed on your operating system:
+#### 🪟 **Windows**
+- Install **Node.js** (LTS) from nodejs.org
+- Install **MongoDB Community Server** (or use **MongoDB Atlas**)
+- Install **Git**
 
-#### **🪟 Windows**
+#### 🍎 **macOS**
+```sh
+brew install node
+brew tap mongodb/brew
+brew install mongodb-community
+brew services start mongodb-community
+```
+Git is usually preinstalled.
 
-1. **Node.js:** Download and install the LTS version from [nodejs.org](https://nodejs.org/).  
-2. **MongoDB:**  
-   * **Option A (Local):** Download **MongoDB Community Server** from [mongodb.com](https://www.mongodb.com/try/download/community) and install it. *Note: Select "Install MongoDB as a Service" during installation.*  
-   * **Option B (Cloud):** Create a free account on [MongoDB Atlas](https://www.mongodb.com/atlas) and get your connection string.  
-3. **Git:** Download and install from [git-scm.com](https://git-scm.com/).
+#### 🐧 **Linux (Ubuntu/Debian)**
+```sh
+curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
+sudo apt-get install -y nodejs
+```
+Install MongoDB following official docs.
 
-#### **🍎 macOS**
+---
 
-1. **Node.js:** Install via Homebrew (recommended) or download the installer.  
-   brew install node
+## 2. Get Your API Key
 
-2. **MongoDB:**  
-   brew tap mongodb/brew  
-   brew install mongodb-community  
-   brew services start mongodb-community
+Get a free Google Gemini API key:
+**https://aistudio.google.com/app/apikey**
 
-3. **Git:** Usually pre-installed. If not: brew install git.
+---
 
-#### **🐧 Linux (Ubuntu/Debian)**
+## 3. Project Setup
 
-1. **Node.js:**  
-   curl \-fsSL \[https://deb.nodesource.com/setup\_lts.x\](https://deb.nodesource.com/setup\_lts.x) | sudo \-E bash \-  
-   sudo apt-get install \-y nodejs
-
-2. **MongoDB:** Follow the [official installation guide](https://www.google.com/search?q=https://www.mongodb.com/docs/manual/administration/install-on-linux/) for your distro.  
-   * Start the service: sudo systemctl start mongod
-
-### **2\. Get your API Key**
-
-You need a Google Gemini API Key to power the AI features.
-
-* Get it for free here: [Google AI Studio](https://aistudio.google.com/app/apikey)
-
-### **3\. Project Setup (All Platforms)**
-
-Open your terminal (Command Prompt, PowerShell, or Terminal) and follow these steps:
-
-#### **Step 1: Clone the Repository**
-
-git clone \[https://github.com/yourusername/doc-intel-hub.git\](https://github.com/yourusername/doc-intel-hub.git)  
+Clone the repository:
+```sh
+git clone https://github.com/jeevansahukar8-web/doc-intel-hub
 cd doc-intel-hub
+```
 
-#### **Step 2: Backend Configuration**
+### Backend Setup
+```sh
+cd server
+npm install
+```
 
-1. Navigate to the server folder:  
-   cd server
-
-2. Install dependencies:  
-   npm install
-
-3. **Create the Environment File:**  
-   * Create a file named .env inside the server folder.  
-   * Add the following content (replace the placeholders):
-
+Create **.env** inside `/server`:
+```env
 PORT=5000
 
-\# Use this for local MongoDB:  
-MONGO\_URI=mongodb://localhost:27017/doc\_intel\_hub  
-\# OR use your Atlas Connection String if using Cloud
+# Local MongoDB
+MONGO_URI=mongodb://localhost:27017/doc_intel_hub
+# OR your Atlas URI
 
-JWT\_SECRET=your\_super\_secure\_random\_string  
-GEMINI\_API\_KEY=paste\_your\_google\_api\_key\_here
+JWT_SECRET=your_super_secure_random_string
+GEMINI_API_KEY=your_google_api_key_here
+```
 
-#### **Step 3: Frontend Configuration**
+### Frontend Setup
+```sh
+cd ../client
+npm install
+```
 
-1. Open a **new** terminal window/tab.  
-2. Navigate to the client folder (from the project root):  
-   cd client
+---
 
-3. Install dependencies:  
-   npm install
+## 4. Running the Application
 
-### **4\. Running the Application**
-
-To run the app, you need to keep **two terminals** open: one for the backend and one for the frontend.
-
-#### **Terminal 1: Start Backend (Server)**
-
-Make sure you are inside the server directory.
-
+### Terminal 1 — Start Backend
+```sh
+cd server
 node server.js
+```
+Expected output:
+```
+🚀 Server running on port 5000
+✅ MongoDB Connected
+```
 
-* **Success Output:** 🚀 Server running on port 5000 and ✅ MongoDB Connected
-
-#### **Terminal 2: Start Frontend (Client)**
-
-Make sure you are inside the client directory.
-
+### Terminal 2 — Start Frontend
+```sh
+cd client
 npm run dev
+```
+Expected output:
+```
+➜ Local: http://localhost:5173/
+```
 
-* **Success Output:** ➜ Local: http://localhost:5173/
+---
 
-### **5\. Access the App**
+## 5. Access the App
+Open: **http://localhost:5173/**
 
-Open your browser and visit: [**http://localhost:5173**](https://www.google.com/search?q=http://localhost:5173)
+---
 
-## **📖 Usage Guide**
+## 📖 Usage Guide
+1. **Register/Login** to access your dashboard.
+2. **Upload** a PDF/DOCX/TXT file.
+3. **Select** a document:
+   - PDFs open in a PDF viewer.
+   - TXT/DOCX render as plain extracted text.
+4. **Ask questions** in the chat panel — AI responds based on the selected document.
 
-1. **Register/Login:** Create an account to access your private dashboard.  
-2. **Upload:** Click the "Upload PDF/TXT/DOCX" button in the sidebar.  
-3. **Select a Document:** Click on a file in the sidebar list.  
-   * **PDFs:** Will render in the PDF viewer.  
-   * **DOCX/TXT:** Will render as extracted text.  
-4. **Chat:** Type your question in the chat box on the right. The AI will analyze the specific document selected and provide an answer.
+---
 
-## **📂 Project Structure**
-
-doc-intel-hub/  
-├── client/                 \# React Frontend  
-│   ├── src/  
-│   │   ├── pages/          \# Login, Register, Profile  
-│   │   ├── App.jsx         \# Main Dashboard Logic  
-│   │   └── main.jsx        \# Entry point  
-│   └── ...  
-├── server/                 \# Express Backend  
-│   ├── models/             \# Mongoose Schemas (User, Document, Chat)  
-│   ├── uploads/            \# Local storage for uploaded files  
-│   ├── server.js           \# Main server logic & routes  
-│   └── ...  
+## 📂 Project Structure
+```
+doc-intel-hub/
+├── client/                # React Frontend
+│   ├── src/
+│   │   ├── pages/         # Login, Register, Dashboard
+│   │   ├── App.jsx        # Main layout & routes
+│   │   └── main.jsx       # Entry point
+├── server/                # Express Backend
+│   ├── models/            # Mongoose models (User, Document, Chat)
+│   ├── uploads/           # Stored uploaded files
+│   ├── server.js          # Main Express server
 └── README.md
+```
 
-## **🔒 Security Note**
+---
 
-* This project stores uploaded files locally in the server/uploads directory.  
-* Ensure .env files are included in your .gitignore to protect your API keys.
+## 🔒 Security Notes
+- Uploaded files are stored locally in `server/uploads`.
+- Never push `.env` to GitHub — it contains your API keys.
+- JWT tokens are securely hashed and validated on every request.
+
+---
+
+## ⭐ Contributing
+Pull requests are welcome! Feel free to open issues for bugs or enhancements.
+
+---
+
+## 📜 License
+This project is licensed under the **MIT License**.
+
+---
+
+**Developed with ❤️ by Jeevan Sahukar**
+
