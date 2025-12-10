@@ -19,7 +19,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Serve uploads publicly
+// --- CRITICAL FIX FOR PREVIEW: Serve the uploads folder publicly ---
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Config
@@ -28,8 +28,27 @@ const MONGO_URI = process.env.MONGO_URI;
 const API_KEY = process.env.GEMINI_API_KEY;
 const JWT_SECRET = process.env.JWT_SECRET;
 
+if (!API_KEY) {
+    console.error("❌ FATAL ERROR: GEMINI_API_KEY is missing in .env");
+    process.exit(1);
+}
+
 const genAI = new GoogleGenerativeAI(API_KEY);
 const fileManager = new GoogleAIFileManager(API_KEY);
+
+// --- HELPER: RETRY LOGIC FOR 503 ERRORS ---
+async function retryWithBackoff(fn, retries = 3, delay = 2000) {
+    try {
+        return await fn();
+    } catch (error) {
+        if (retries === 0 || !error.message.includes('503')) {
+            throw error;
+        }
+        console.log(`⚠️ Model Overloaded (503). Retrying in ${delay/1000}s... (${retries} attempts left)`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return retryWithBackoff(fn, retries - 1, delay * 2);
+    }
+}
 
 // Multer Storage
 const storage = multer.diskStorage({
@@ -41,6 +60,7 @@ const storage = multer.diskStorage({
     cb(null, uploadPath);
   },
   filename: function (req, file, cb) {
+    // Sanitize filename
     cb(null, Date.now() + '-' + file.originalname.replace(/\s+/g, '_'));
   }
 });
@@ -71,6 +91,9 @@ const authenticateToken = (req, res, next) => {
 app.post('/api/auth/register', async (req, res) => {
   try {
     const { username, email, password } = req.body;
+    const existingUser = await User.findOne({ email });
+    if(existingUser) return res.status(400).json({ error: 'User already exists' });
+
     const hashedPassword = await bcrypt.hash(password, 10);
     const user = new User({ username, email, password: hashedPassword });
     await user.save();
@@ -101,20 +124,36 @@ app.post('/api/upload', authenticateToken, upload.single('file'), async (req, re
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
-    // Upload to Google
+    console.log(`📂 Starting upload for: ${req.file.originalname}`);
+
+    // Validate mime type
+    const allowedMimeTypes = ['application/pdf', 'text/plain'];
+    if (!allowedMimeTypes.includes(req.file.mimetype)) {
+      if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+      return res.status(400).json({ error: 'Only PDF and Text files are supported' });
+    }
+
+    // Upload to Google AI File Manager
+    // Retry logic is less critical here, but good practice.
     const uploadResponse = await fileManager.uploadFile(req.file.path, {
       mimeType: req.file.mimetype,
       displayName: req.file.originalname,
     });
 
+    console.log(`✅ File Uploaded to Google: ${uploadResponse.file.uri}`);
+
     const newDoc = new Document({
       userId: req.user.userId,
-      filename: req.file.filename, 
+      filename: req.file.filename,         // Local filename (for preview)
       originalName: req.file.originalname,
-      content: uploadResponse.file.uri, 
+      content: uploadResponse.file.uri,    // Google URI (for AI)
     });
 
     await newDoc.save();
+
+    // ⚠️ IMPORTANT: We do NOT delete the file here anymore.
+    // The file stays in 'uploads/' so your frontend can preview it via http://localhost:5000/uploads/filename
+
     res.status(201).json({ message: 'File processed successfully', doc: newDoc });
 
   } catch (error) {
@@ -134,29 +173,35 @@ app.get('/api/documents', authenticateToken, async (req, res) => {
 
 app.delete('/api/documents/:id', authenticateToken, async (req, res) => {
   try {
-    const result = await Document.deleteOne({ _id: req.params.id, userId: req.user.userId });
-    if (result.deletedCount === 0) return res.status(404).json({ error: 'Not found or unauthorized' });
+    const doc = await Document.findOne({ _id: req.params.id, userId: req.user.userId });
+    if (!doc) return res.status(404).json({ error: 'Not found or unauthorized' });
+
+    // 1. Delete from MongoDB
+    await Document.deleteOne({ _id: req.params.id });
     
-    // Also delete chat history for this document
-    await Chat.deleteOne({ docId: req.params.id, userId: req.user.userId });
+    // 2. Delete Chat History
+    await Chat.deleteOne({ docId: req.params.id });
+
+    // 3. Delete Local File (Cleanup)
+    const filePath = path.join(__dirname, 'uploads', doc.filename);
+    if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+    }
 
     res.json({ message: 'Deleted' });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Delete failed' });
   }
 });
 
-// 3. Chat Routes (UPDATED FOR PERSISTENCE & STRICT ANSWERS)
-
-// Get Chat History
+// 3. Chat Routes
 app.get('/api/chat/:docId', authenticateToken, async (req, res) => {
   try {
     const chat = await Chat.findOne({ 
       docId: req.params.docId, 
       userId: req.user.userId 
     });
-
-    // Return messages if found, else empty array
     res.json(chat ? chat.messages : []);
   } catch (error) {
     console.error("Chat Fetch Error:", error);
@@ -164,7 +209,6 @@ app.get('/api/chat/:docId', authenticateToken, async (req, res) => {
   }
 });
 
-// Post Message & Save
 app.post('/api/chat', authenticateToken, async (req, res) => {
   const { docId, question } = req.body;
 
@@ -172,30 +216,39 @@ app.post('/api/chat', authenticateToken, async (req, res) => {
     const doc = await Document.findOne({ _id: docId, userId: req.user.userId });
     if (!doc) return res.status(404).json({ error: 'Document not found' });
 
-    // 1. Generate AI Response
+    const isPdf = doc.originalName.toLowerCase().endsWith('.pdf');
+    const mimeType = isPdf ? 'application/pdf' : 'text/plain';
+
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
     
-    // 🟢 UPDATED PROMPT: Strict Context Mode
-    const result = await model.generateContent([
-      { 
-        fileData: { 
-          mimeType: "application/pdf", 
-          fileUri: doc.content 
-        } 
-      },
-      { 
-        text: `You are a strict document assistant. Answer the user's question ONLY using the provided PDF document. 
-        - Do not use outside knowledge or general information.
-        - If the answer is not found in the document, explicitly say: "I cannot find this information in the provided document."
-        - Do not guess.
-        
-        Question: ${question}` 
-      }
-    ]);
-    
-    const answer = (await result.response).text();
+    console.log(`🤖 Asking Gemini...`);
 
-    // 2. Save to Database
+    // --- EXECUTE WITH RETRY LOGIC ---
+    // We wrap the generateContent call in our helper function
+    const result = await retryWithBackoff(async () => {
+        return await model.generateContent([
+            { 
+                fileData: { 
+                    mimeType: mimeType, 
+                    fileUri: doc.content 
+                } 
+            },
+            { 
+                text: `You are an intelligent document research assistant.
+                Answer the question below strictly using the provided document context.
+                
+                Question: ${question}
+                
+                Format your answer as:
+                **Answer:** [Your answer]
+                > **Reference:** "[Direct quote from text]"` 
+            }
+        ]);
+    });
+    
+    const answer = result.response.text();
+
+    // Save to Database
     let chat = await Chat.findOne({ docId, userId: req.user.userId });
     
     if (!chat) {
@@ -208,12 +261,20 @@ app.post('/api/chat', authenticateToken, async (req, res) => {
     
     await chat.save();
 
-    // 3. Respond
     res.json({ answer });
 
   } catch (error) {
-    console.error("AI Error:", error);
-    res.status(500).json({ error: 'AI processing failed' });
+    console.error("❌ AI Error:", error);
+
+    // Specific error messages
+    if (error.message && (error.message.includes('403') || error.message.includes('Forbidden'))) {
+       return res.status(403).json({ error: "Permission Denied: Please re-upload this document." });
+    }
+    if (error.message && error.message.includes('503')) {
+        return res.status(503).json({ error: "AI Service Overloaded. Please try again in a few seconds." });
+     }
+
+    res.status(500).json({ error: 'AI processing failed', details: error.message });
   }
 });
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   FileText, MessageSquare, Send, Loader2, 
-  Trash2, Plus, Bot, Menu, UserCircle, LogOut, X
+  Trash2, Plus, Bot, Menu, UserCircle, LogOut, X, CheckCircle
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Routes, Route, useNavigate, Link } from 'react-router-dom';
@@ -67,14 +67,15 @@ function Dashboard() {
     formData.append('file', file);
     setUploading(true);
     try {
-      await fetch(`${API_BASE}/upload`, { 
+      const res = await fetch(`${API_BASE}/upload`, { 
         method: 'POST', 
         body: formData,
         headers: { 'Authorization': `Bearer ${token}` } 
       });
+      if(!res.ok) throw new Error('Upload Failed');
       fetchDocuments();
       alert('Document uploaded successfully!');
-    } catch (err) { alert('Upload failed.'); } 
+    } catch (err) { alert('Upload failed. Ensure file is PDF or TXT.'); } 
     finally { setUploading(false); }
   };
 
@@ -119,7 +120,7 @@ function Dashboard() {
   return (
     <div className="flex h-screen font-sans overflow-hidden bg-transparent">
       
-      {/* SIDEBAR - Glass Effect */}
+      {/* SIDEBAR */}
       <div className={`${sidebarOpen ? 'w-80 translate-x-0' : 'w-0 -translate-x-full opacity-0'} glass-panel absolute md:relative z-30 h-full flex flex-col transition-all duration-300 ease-out border-r-0 md:border-r border-white/20`}>
         <div className="p-6 border-b border-white/10 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -131,7 +132,6 @@ function Dashboard() {
               <p className="text-xs text-blue-200">AI Workspace</p>
             </div>
           </div>
-          {/* Close sidebar on mobile */}
           <button onClick={() => setSidebarOpen(false)} className="md:hidden text-white/70"><X size={20}/></button>
         </div>
 
@@ -143,8 +143,8 @@ function Dashboard() {
 
           <label className="flex items-center justify-center w-full p-3 rounded-xl border border-dashed border-white/30 hover:border-blue-400 hover:bg-blue-500/10 cursor-pointer transition-all group">
             {uploading ? <Loader2 className="animate-spin text-blue-400 mr-2" /> : <Plus className="text-blue-300 group-hover:text-blue-400 mr-2" size={18} />}
-            <span className="text-sm font-medium text-gray-300 group-hover:text-white">{uploading ? "Uploading..." : "New PDF Upload"}</span>
-            <input type="file" className="hidden" accept=".pdf" onChange={handleUpload} disabled={uploading} />
+            <span className="text-sm font-medium text-gray-300 group-hover:text-white">{uploading ? "Uploading..." : "Upload PDF/TXT"}</span>
+            <input type="file" className="hidden" accept=".pdf,.txt" onChange={handleUpload} disabled={uploading} />
           </label>
         </div>
 
@@ -161,7 +161,12 @@ function Dashboard() {
               }`}
             >
               <FileText size={18} className={selectedDoc?._id === doc._id ? 'text-white' : 'text-blue-400 group-hover:text-blue-300'} />
-              <div className="truncate text-sm flex-1 font-medium">{doc.originalName || doc.filename}</div>
+              <div className="flex-1 min-w-0">
+                <div className="truncate text-sm font-medium">{doc.originalName || doc.filename}</div>
+                <div className="flex items-center gap-1 mt-1 text-[10px] text-green-400/80">
+                  <CheckCircle size={10} /> Processed
+                </div>
+              </div>
               <button 
                 onClick={(e) => handleDelete(e, doc._id)}
                 className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-500/20 hover:text-red-400 rounded-lg transition-all"
@@ -182,7 +187,6 @@ function Dashboard() {
       {/* MAIN AREA */}
       <div className="flex-1 flex flex-col h-full relative glass-panel m-0 md:m-4 md:rounded-2xl border-none md:border overflow-hidden">
         
-        {/* Header */}
         <header className="h-16 border-b border-white/10 flex items-center justify-between px-6 bg-white/5 backdrop-blur-md z-20">
           <div className="flex items-center gap-4">
             <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2 hover:bg-white/10 rounded-lg text-white transition-colors">
@@ -203,22 +207,29 @@ function Dashboard() {
         <div className="flex-1 flex overflow-hidden relative">
           {selectedDoc ? (
             <>
-              {/* PDF VIEWER - Hidden on mobile, takes 50% on desktop */}
-              <div className="hidden md:block w-1/2 bg-slate-900 border-r border-white/10">
-                <iframe src={getFileUrl(selectedDoc.filename)} className="w-full h-full" title="PDF Viewer" />
+              {/* FILE PREVIEW */}
+              <div className="hidden md:block w-1/2 bg-slate-900 border-r border-white/10 flex items-center justify-center">
+                {selectedDoc.filename.endsWith('.pdf') ? (
+                   <iframe src={getFileUrl(selectedDoc.filename)} className="w-full h-full" title="PDF Viewer" />
+                ) : (
+                   <div className="text-gray-500 flex flex-col items-center">
+                     <FileText size={48} className="mb-4 opacity-50"/>
+                     <p>Text file preview not available in iframe.</p>
+                     <a href={getFileUrl(selectedDoc.filename)} target="_blank" className="text-blue-400 mt-2 hover:underline">Download / View Raw</a>
+                   </div>
+                )}
               </div>
 
-              {/* CHAT INTERFACE - Full width on mobile, 50% on desktop */}
+              {/* CHAT INTERFACE */}
               <div className="w-full md:w-1/2 flex flex-col bg-slate-900/50 backdrop-blur-sm">
                 
-                {/* Messages Area */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-6">
                   {chatHistory.length === 0 && (
                     <div className="flex flex-col items-center justify-center h-full text-gray-500 space-y-4 animate-fade-in">
                       <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center border border-white/10">
                         <MessageSquare className="text-blue-400 w-8 h-8" />
                       </div>
-                      <p className="text-sm font-medium">Ask specific questions about this PDF.</p>
+                      <p className="text-sm font-medium">Ask specific questions about this document.</p>
                     </div>
                   )}
                   
@@ -229,7 +240,6 @@ function Dashboard() {
                         ? 'bg-blue-600 text-white rounded-br-sm border-blue-500' 
                         : 'bg-white/10 text-gray-100 rounded-bl-sm border-white/10'
                       }`}>
-                        {/* PROSE CLASS FOR FORMATTED MARKDOWN */}
                         <div className={`prose prose-sm max-w-none ${msg.role === 'user' ? 'prose-invert text-white' : 'prose-invert text-gray-100'}`}>
                           <ReactMarkdown>{msg.content}</ReactMarkdown>
                         </div>
@@ -241,14 +251,13 @@ function Dashboard() {
                     <div className="flex justify-start animate-pulse">
                       <div className="bg-white/5 border border-white/10 px-4 py-3 rounded-2xl flex items-center gap-3">
                         <Loader2 className="w-4 h-4 animate-spin text-blue-400" />
-                        <span className="text-xs text-gray-400 font-medium">Analyzing document...</span>
+                        <span className="text-xs text-gray-400 font-medium">Analyzing document & references...</span>
                       </div>
                     </div>
                   )}
                   <div ref={chatEndRef} />
                 </div>
 
-                {/* Input Area */}
                 <div className="p-4 border-t border-white/10 bg-white/5 backdrop-blur-md">
                   <div className="flex items-center gap-2 bg-black/20 border border-white/10 rounded-xl p-1.5 focus-within:border-blue-500/50 focus-within:ring-1 focus-within:ring-blue-500/50 transition-all">
                     <input 
@@ -281,7 +290,7 @@ function Dashboard() {
               </div>
               <h3 className="text-2xl font-bold text-white mt-6 mb-2">Welcome, {username}</h3>
               <p className="text-gray-400 max-w-md leading-relaxed">
-                Select a document from the library or upload a new PDF to harness the power of AI analysis.
+                Select a document from the library or upload a new PDF/Text file to harness the power of AI analysis.
               </p>
             </div>
           )}
