@@ -9,8 +9,11 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Profile from './pages/Profile';
 
-const API_BASE = 'http://localhost:5000/api';
-const getFileUrl = (filename) => `http://localhost:5000/uploads/${filename}`;
+// --- UPDATED CONFIGURATION ---
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_BASE = `${API_URL}/api`;
+const getFileUrl = (filename) => `${API_URL}/uploads/${filename}`;
+// -----------------------------
 
 function Dashboard() {
   const [documents, setDocuments] = useState([]);
@@ -34,13 +37,10 @@ function Dashboard() {
 
   useEffect(() => {
     if (selectedDoc) {
-      // 1. UPDATED PREVIEW LOGIC
-      // If PDF, we use iframe. If Text or Docx, we fetch content from API.
       const isPdf = selectedDoc.filename.toLowerCase().endsWith('.pdf');
       
       if (!isPdf) {
         setFileContent("Loading preview...");
-        // Call the new backend route that extracts text (works for txt and docx)
         fetch(`${API_BASE}/doc-content/${selectedDoc._id}`, {
             headers: { 'Authorization': `Bearer ${token}` }
         })
@@ -144,7 +144,6 @@ function Dashboard() {
 
   return (
     <div className="flex h-screen font-sans overflow-hidden bg-transparent">
-      
       {/* SIDEBAR */}
       <div className={`${sidebarOpen ? 'w-80 translate-x-0' : 'w-0 -translate-x-full opacity-0'} glass-panel absolute md:relative z-30 h-full flex flex-col transition-all duration-300 ease-out border-r-0 md:border-r border-white/20`}>
         <div className="p-6 border-b border-white/10 flex items-center justify-between">
@@ -168,7 +167,6 @@ function Dashboard() {
 
           <label className="flex items-center justify-center w-full p-3 rounded-xl border border-dashed border-white/30 hover:border-blue-400 hover:bg-blue-500/10 cursor-pointer transition-all group">
             {uploading ? <Loader2 className="animate-spin text-blue-400 mr-2" /> : <Plus className="text-blue-300 group-hover:text-blue-400 mr-2" size={18} />}
-            {/* 2. UPDATED INPUT ACCEPT ATTRIBUTE */}
             <span className="text-sm font-medium text-gray-300 group-hover:text-white">{uploading ? "Uploading..." : "Upload PDF/TXT/DOCX"}</span>
             <input type="file" className="hidden" accept=".pdf,.txt,.docx" onChange={handleUpload} disabled={uploading} />
           </label>
@@ -238,7 +236,6 @@ function Dashboard() {
                 {selectedDoc.filename.toLowerCase().endsWith('.pdf') ? (
                    <iframe src={getFileUrl(selectedDoc.filename)} className="w-full h-full" title="PDF Viewer" />
                 ) : (
-                   /* 3. UPDATED TEXT PREVIEWER (Handles docx text too) */
                    <div className="w-full h-full overflow-auto p-8 bg-white/5 text-gray-300 font-mono text-sm leading-relaxed whitespace-pre-wrap scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent">
                      {fileContent || "Loading content..."}
                    </div>

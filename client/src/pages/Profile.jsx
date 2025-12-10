@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { FileText, Trash2, ArrowLeft, User, Calendar } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 export default function Profile() {
   const [documents, setDocuments] = useState([]);
   const username = localStorage.getItem('username');
@@ -16,7 +18,7 @@ export default function Profile() {
 
   const fetchDocuments = async () => {
     try {
-      const res = await fetch('http://localhost:5000/api/documents', {
+      const res = await fetch(`${API_URL}/api/documents`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
@@ -27,7 +29,7 @@ export default function Profile() {
   const handleDelete = async (docId) => {
     if (!confirm("Delete this document?")) return;
     try {
-      await fetch(`http://localhost:5000/api/documents/${docId}`, {
+      await fetch(`${API_URL}/api/documents/${docId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
