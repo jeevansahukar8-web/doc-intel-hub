@@ -15,6 +15,7 @@ const getFileUrl = (filename) => `http://localhost:5000/uploads/${filename}`;
 function Dashboard() {
   const [documents, setDocuments] = useState([]);
   const [selectedDoc, setSelectedDoc] = useState(null);
+  const [fileContent, setFileContent] = useState('');
   const [chatHistory, setChatHistory] = useState([]);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
@@ -32,9 +33,33 @@ function Dashboard() {
   }, [token, navigate]);
 
   useEffect(() => {
-    if (selectedDoc) { fetchChatHistory(selectedDoc._id); } 
-    else { setChatHistory([]); }
-  }, [selectedDoc]);
+    if (selectedDoc) {
+      // 1. UPDATED PREVIEW LOGIC
+      // If PDF, we use iframe. If Text or Docx, we fetch content from API.
+      const isPdf = selectedDoc.filename.toLowerCase().endsWith('.pdf');
+      
+      if (!isPdf) {
+        setFileContent("Loading preview...");
+        // Call the new backend route that extracts text (works for txt and docx)
+        fetch(`${API_BASE}/doc-content/${selectedDoc._id}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        })
+          .then(res => {
+            if (!res.ok) throw new Error("Failed to load");
+            return res.text();
+          })
+          .then(text => setFileContent(text))
+          .catch(err => setFileContent("Preview not available for this file type."));
+      } else {
+        setFileContent('');
+      }
+      
+      fetchChatHistory(selectedDoc._id);
+    } else {
+      setChatHistory([]);
+      setFileContent('');
+    }
+  }, [selectedDoc, token]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -75,7 +100,7 @@ function Dashboard() {
       if(!res.ok) throw new Error('Upload Failed');
       fetchDocuments();
       alert('Document uploaded successfully!');
-    } catch (err) { alert('Upload failed. Ensure file is PDF or TXT.'); } 
+    } catch (err) { alert('Upload failed. Ensure file is PDF, DOCX, or TXT.'); } 
     finally { setUploading(false); }
   };
 
@@ -143,8 +168,9 @@ function Dashboard() {
 
           <label className="flex items-center justify-center w-full p-3 rounded-xl border border-dashed border-white/30 hover:border-blue-400 hover:bg-blue-500/10 cursor-pointer transition-all group">
             {uploading ? <Loader2 className="animate-spin text-blue-400 mr-2" /> : <Plus className="text-blue-300 group-hover:text-blue-400 mr-2" size={18} />}
-            <span className="text-sm font-medium text-gray-300 group-hover:text-white">{uploading ? "Uploading..." : "Upload PDF/TXT"}</span>
-            <input type="file" className="hidden" accept=".pdf,.txt" onChange={handleUpload} disabled={uploading} />
+            {/* 2. UPDATED INPUT ACCEPT ATTRIBUTE */}
+            <span className="text-sm font-medium text-gray-300 group-hover:text-white">{uploading ? "Uploading..." : "Upload PDF/TXT/DOCX"}</span>
+            <input type="file" className="hidden" accept=".pdf,.txt,.docx" onChange={handleUpload} disabled={uploading} />
           </label>
         </div>
 
@@ -208,14 +234,13 @@ function Dashboard() {
           {selectedDoc ? (
             <>
               {/* FILE PREVIEW */}
-              <div className="hidden md:block w-1/2 bg-slate-900 border-r border-white/10 flex items-center justify-center">
-                {selectedDoc.filename.endsWith('.pdf') ? (
+              <div className="hidden md:block w-1/2 bg-slate-900 border-r border-white/10 flex flex-col">
+                {selectedDoc.filename.toLowerCase().endsWith('.pdf') ? (
                    <iframe src={getFileUrl(selectedDoc.filename)} className="w-full h-full" title="PDF Viewer" />
                 ) : (
-                   <div className="text-gray-500 flex flex-col items-center">
-                     <FileText size={48} className="mb-4 opacity-50"/>
-                     <p>Text file preview not available in iframe.</p>
-                     <a href={getFileUrl(selectedDoc.filename)} target="_blank" className="text-blue-400 mt-2 hover:underline">Download / View Raw</a>
+                   /* 3. UPDATED TEXT PREVIEWER (Handles docx text too) */
+                   <div className="w-full h-full overflow-auto p-8 bg-white/5 text-gray-300 font-mono text-sm leading-relaxed whitespace-pre-wrap scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent">
+                     {fileContent || "Loading content..."}
                    </div>
                 )}
               </div>
@@ -251,7 +276,7 @@ function Dashboard() {
                     <div className="flex justify-start animate-pulse">
                       <div className="bg-white/5 border border-white/10 px-4 py-3 rounded-2xl flex items-center gap-3">
                         <Loader2 className="w-4 h-4 animate-spin text-blue-400" />
-                        <span className="text-xs text-gray-400 font-medium">Analyzing document & references...</span>
+                        <span className="text-xs text-gray-400 font-medium">Analyzing document...</span>
                       </div>
                     </div>
                   )}
@@ -290,7 +315,7 @@ function Dashboard() {
               </div>
               <h3 className="text-2xl font-bold text-white mt-6 mb-2">Welcome, {username}</h3>
               <p className="text-gray-400 max-w-md leading-relaxed">
-                Select a document from the library or upload a new PDF/Text file to harness the power of AI analysis.
+                Select a document from the library or upload a new PDF/Text/Docx file to harness the power of AI analysis.
               </p>
             </div>
           )}

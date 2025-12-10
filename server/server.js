@@ -9,6 +9,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { GoogleAIFileManager } = require('@google/generative-ai/server');
+const mammoth = require('mammoth'); 
 
 // Import Models
 const Document = require('./models/Document');
@@ -19,7 +20,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// --- CRITICAL FIX FOR PREVIEW: Serve the uploads folder publicly ---
+// Serve uploads folder publicly so frontend can fetch raw files if needed
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Config
@@ -50,7 +51,23 @@ async function retryWithBackoff(fn, retries = 3, delay = 2000) {
     }
 }
 
-// Multer Storage
+// --- HELPER: EXTRACT TEXT FROM LOCAL FILE ---
+async function extractTextFromFile(filePath, filename) {
+    try {
+        if (filename.toLowerCase().endsWith('.docx')) {
+            const result = await mammoth.extractRawText({ path: filePath });
+            return result.value;
+        } else {
+            // Assume text file (txt, md, etc)
+            return fs.readFileSync(filePath, 'utf-8');
+        }
+    } catch (error) {
+        console.error("Error extracting text:", error);
+        throw new Error("Failed to read document content.");
+    }
+}
+
+// Multer Storage configuration
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     const uploadPath = 'uploads/';
@@ -60,7 +77,7 @@ const storage = multer.diskStorage({
     cb(null, uploadPath);
   },
   filename: function (req, file, cb) {
-    // Sanitize filename
+    // Sanitize filename to prevent issues
     cb(null, Date.now() + '-' + file.originalname.replace(/\s+/g, '_'));
   }
 });
@@ -119,7 +136,7 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// 2. Document Routes
+// 2. Document Routes (Upload)
 app.post('/api/upload', authenticateToken, upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
@@ -127,32 +144,39 @@ app.post('/api/upload', authenticateToken, upload.single('file'), async (req, re
     console.log(`📂 Starting upload for: ${req.file.originalname}`);
 
     // Validate mime type
-    const allowedMimeTypes = ['application/pdf', 'text/plain'];
+    const allowedMimeTypes = [
+        'application/pdf', 
+        'text/plain', 
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document' // .docx
+    ];
+    
     if (!allowedMimeTypes.includes(req.file.mimetype)) {
       if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
-      return res.status(400).json({ error: 'Only PDF and Text files are supported' });
+      return res.status(400).json({ error: 'Only PDF, DOCX, and Text files are supported' });
     }
 
-    // Upload to Google AI File Manager
-    // Retry logic is less critical here, but good practice.
-    const uploadResponse = await fileManager.uploadFile(req.file.path, {
-      mimeType: req.file.mimetype,
-      displayName: req.file.originalname,
-    });
+    // --- FIX FOR VALIDATION ERROR ---
+    // We default to "stored_locally" so Mongoose doesn't complain about empty "content".
+    // For PDFs, we overwrite this with the actual Google URI.
+    let fileUri = "stored_locally"; 
 
-    console.log(`✅ File Uploaded to Google: ${uploadResponse.file.uri}`);
+    if (req.file.mimetype === 'application/pdf') {
+        const uploadResponse = await fileManager.uploadFile(req.file.path, {
+            mimeType: req.file.mimetype,
+            displayName: req.file.originalname,
+        });
+        fileUri = uploadResponse.file.uri;
+        console.log(`✅ PDF Uploaded to Google: ${fileUri}`);
+    }
 
     const newDoc = new Document({
       userId: req.user.userId,
-      filename: req.file.filename,         // Local filename (for preview)
+      filename: req.file.filename,         
       originalName: req.file.originalname,
-      content: uploadResponse.file.uri,    // Google URI (for AI)
+      content: fileUri,                    
     });
 
     await newDoc.save();
-
-    // ⚠️ IMPORTANT: We do NOT delete the file here anymore.
-    // The file stays in 'uploads/' so your frontend can preview it via http://localhost:5000/uploads/filename
 
     res.status(201).json({ message: 'File processed successfully', doc: newDoc });
 
@@ -195,6 +219,25 @@ app.delete('/api/documents/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// --- NEW ROUTE: Get Text Content for Preview (Frontend) ---
+app.get('/api/doc-content/:id', authenticateToken, async (req, res) => {
+    try {
+        const doc = await Document.findOne({ _id: req.params.id, userId: req.user.userId });
+        if (!doc) return res.status(404).send("Document not found");
+
+        const filePath = path.join(__dirname, 'uploads', doc.filename);
+        if (!fs.existsSync(filePath)) return res.status(404).send("File missing on server");
+
+        // Extract text (works for .docx and .txt)
+        const text = await extractTextFromFile(filePath, doc.filename);
+        res.send(text);
+
+    } catch (err) {
+        console.error("Preview Error:", err);
+        res.status(500).send("Error reading document content");
+    }
+});
+
 // 3. Chat Routes
 app.get('/api/chat/:docId', authenticateToken, async (req, res) => {
   try {
@@ -217,19 +260,20 @@ app.post('/api/chat', authenticateToken, async (req, res) => {
     if (!doc) return res.status(404).json({ error: 'Document not found' });
 
     const isPdf = doc.originalName.toLowerCase().endsWith('.pdf');
-    const mimeType = isPdf ? 'application/pdf' : 'text/plain';
-
+    
+    // Using gemini-2.5-flash as requested
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
     
-    console.log(`🤖 Asking Gemini...`);
+    console.log(`🤖 Asking Gemini about ${doc.originalName}...`);
 
-    // --- EXECUTE WITH RETRY LOGIC ---
-    // We wrap the generateContent call in our helper function
-    const result = await retryWithBackoff(async () => {
-        return await model.generateContent([
+    let promptParts = [];
+
+    if (isPdf) {
+        // PDF Strategy: Use Google File Manager URI
+        promptParts = [
             { 
                 fileData: { 
-                    mimeType: mimeType, 
+                    mimeType: 'application/pdf', 
                     fileUri: doc.content 
                 } 
             },
@@ -243,7 +287,37 @@ app.post('/api/chat', authenticateToken, async (req, res) => {
                 **Answer:** [Your answer]
                 > **Reference:** "[Direct quote from text]"` 
             }
-        ]);
+        ];
+    } else {
+        // Text/Docx Strategy: Extract locally and embed in prompt
+        const filePath = path.join(__dirname, 'uploads', doc.filename);
+        
+        // This ensures the AI actually sees the file content for non-PDFs
+        let textContent = await extractTextFromFile(filePath, doc.filename);
+
+        promptParts = [
+            { 
+                text: `You are an intelligent document research assistant.
+                Here is the content of the document:
+                
+                """
+                ${textContent}
+                """
+                
+                Answer the question below strictly using the document content above.
+                
+                Question: ${question}
+                
+                Format your answer as:
+                **Answer:** [Your answer]
+                > **Reference:** "[Direct quote from text]"` 
+            }
+        ];
+    }
+
+    // --- EXECUTE WITH RETRY LOGIC ---
+    const result = await retryWithBackoff(async () => {
+        return await model.generateContent(promptParts);
     });
     
     const answer = result.response.text();
